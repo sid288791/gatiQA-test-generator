@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: gatiqa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gatiqa
+      POSTGRES_PASSWORD: gatiqa
+      POSTGRES_DB: gatiqa
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gatiqa -d gatiqa"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Grafana k6 MCP server (Streamable HTTP transport).
+  # MCP endpoint: http://localhost:${MCP_K6_PORT:-8080}${MCP_K6_ENDPOINT:-/mcp}
+  # K8s note: translate `command` into container args and the healthcheck into
+  # an httpGet (path "/") or tcpSocket readiness/liveness probe on port 8080.
+  # The server has no built-in auth — keep it on a trusted network.
+  mcp-k6:
+    image: ${MCP_K6_IMAGE:-grafana/mcp-k6:latest}
+    container_name: gatiqa-mcp-k6
+    restart: unless-stopped
+    command:
+      - "-transport=http"
+      - "-addr=:8080"
+      - "-endpoint=${MCP_K6_ENDPOINT:-/mcp}"
+      - "-stateless=${MCP_K6_STATELESS:-false}"
+      - "-preload=${MCP_K6_PRELOAD:-false}"
+    ports:
+      - "${MCP_K6_PORT:-8080}:8080"
+    healthcheck:
+      # Probe "/" (instant 404) — GET on /mcp opens a long-lived SSE stream.
+      # Any HTTP response line proves the server is listening.
+      test: ["CMD-SHELL", "wget -q -S -O /dev/null http://127.0.0.1:8080/ 2>&1 | grep -q 'HTTP/'"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  pgdata:

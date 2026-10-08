@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gatiqa-test-generator"
+version = "0.1.0"
+description = "LLM-backed structured test-draft generator for gatiQA (internal module, Phase 1)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
